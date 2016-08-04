@@ -166,7 +166,7 @@ public class MapsActivity extends FragmentActivity implements
         if(firstRefresh)
         {
             //Add Start Marker.
-            marker = mMap.addMarker(new MarkerOptions().position(latLng).title("Current Position"));
+            marker = mMap.addMarker(new MarkerOptions().position(latLng).title("Current Position").icon(BitmapDescriptorFactory.fromResource(R.drawable.ba)));
             mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
             mMap.animateCamera(CameraUpdateFactory.zoomTo(15));
             firstRefresh = false;
@@ -235,7 +235,7 @@ public class MapsActivity extends FragmentActivity implements
             {
                 firstSearch = false;
                 LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-                srchMarker = mMap.addMarker(new MarkerOptions().position(latLng).title("Destination"));
+                srchMarker = mMap.addMarker(new MarkerOptions().position(latLng).title("Destination").icon(BitmapDescriptorFactory.fromResource(R.drawable.bb)));
                 mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
             }
             else
