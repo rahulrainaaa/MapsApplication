@@ -3,6 +3,7 @@ package demo.maps.app.mapsapplication;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
@@ -22,9 +23,12 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 
 import java.io.IOException;
 import java.util.List;
@@ -46,7 +50,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
-
     }
 
     @Override
@@ -85,9 +88,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.getUiSettings().setAllGesturesEnabled(true);
         mMap.setOnMarkerClickListener(this);
         LatLng latlng = new LatLng(18.5204, 73.8567);
-        marker = mMap.addMarker(new MarkerOptions().position(latlng).title("My Position"));
+        marker = mMap.addMarker(new MarkerOptions().position(latlng).title("My Position").icon(BitmapDescriptorFactory.fromResource(R.drawable.pinred)));
         mMap.moveCamera(CameraUpdateFactory.newLatLng(latlng));
         //getLocationFromAddress("Delhi, India");
+
+        PolylineOptions options = new PolylineOptions().width(5).color(Color.BLUE).geodesic(true);
+        options.add(new LatLng(18.571949, 73.749686));
+        options.add(new LatLng(21.293998, 74.923534));
+        Polyline line = mMap.addPolyline(options);
     }
 
     @Override
@@ -150,7 +158,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 //First time search only.
                 frstSrch = false;
                 LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-                srchMarker = mMap.addMarker(new MarkerOptions().position(latLng).title("Searched Point"));
+                srchMarker = mMap.addMarker(new MarkerOptions().position(latLng).title("Searched Point").icon(BitmapDescriptorFactory.fromResource(R.drawable.pinblue)));
                 mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
             }
             else
@@ -176,6 +184,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         final EditText input = new EditText(this);
 
         alertDialogBuilder.setView(input);
+        alertDialogBuilder.setTitle("Search Place");
 
         alertDialogBuilder
                 .setCancelable(false)
