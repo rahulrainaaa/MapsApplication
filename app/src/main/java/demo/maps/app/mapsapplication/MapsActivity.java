@@ -114,6 +114,15 @@ public class MapsActivity extends FragmentActivity implements
 
         //Initialize location listener
         locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+
+        //Check if GPS Sensor is on?
+        if ( !locationManager.isProviderEnabled( LocationManager.GPS_PROVIDER ) )
+        {
+            Toast.makeText(getApplicationContext(), "Please Enable GPS Sensor", Toast.LENGTH_LONG).show();
+            startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
+            return;
+        }
+
         locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, this);
         locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000, 0, this);
         Toast.makeText(getApplicationContext(), "Fetching Current Location", Toast.LENGTH_SHORT).show();
