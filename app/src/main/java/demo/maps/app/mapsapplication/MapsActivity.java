@@ -1,7 +1,11 @@
 package demo.maps.app.mapsapplication;
 
+import android.*;
+import android.Manifest;
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.location.Address;
@@ -9,9 +13,12 @@ import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.net.Uri;
+import android.provider.Settings;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
+import android.support.v4.content.ContextCompat;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.EditText;
@@ -46,6 +53,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
+        int check1 = ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION);
+        int check2 = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION);
+
+        if((check1 != PackageManager.PERMISSION_GRANTED) || (check2 != PackageManager.PERMISSION_GRANTED))
+        {
+            Toast.makeText(getApplicationContext(), "Go to permissions and \nEnable all permission", Toast.LENGTH_LONG).show();
+            startInstalledAppDetailsActivity();
+        }
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
@@ -88,7 +103,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.getUiSettings().setAllGesturesEnabled(true);
         mMap.setOnMarkerClickListener(this);
         LatLng latlng = new LatLng(18.5204, 73.8567);
-        marker = mMap.addMarker(new MarkerOptions().position(latlng).title("My Position").icon(BitmapDescriptorFactory.fromResource(R.drawable.pinred)));
+        marker = mMap.addMarker(new MarkerOptions().position(latlng).title("My Position"));
         mMap.moveCamera(CameraUpdateFactory.newLatLng(latlng));
         //getLocationFromAddress("Delhi, India");
 
@@ -153,12 +168,13 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             if (address==null) {
             }
             Address location=address.get(0);
+            String locationName = "" + location.getLocality() + ", " + location.getCountryName() + "-" + location.getPostalCode();
             if(frstSrch)
             {
                 //First time search only.
                 frstSrch = false;
                 LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-                srchMarker = mMap.addMarker(new MarkerOptions().position(latLng).title("Searched Point").icon(BitmapDescriptorFactory.fromResource(R.drawable.pinblue)));
+                srchMarker = mMap.addMarker(new MarkerOptions().position(latLng).title(locationName).icon(BitmapDescriptorFactory.fromResource(R.drawable.pingray)));
                 mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
             }
             else
@@ -204,6 +220,18 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         AlertDialog alertD = alertDialogBuilder.create();
         alertD.show();
 
+    }
+
+    public void startInstalledAppDetailsActivity()
+    {
+        final Intent i = new Intent();
+        i.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        i.addCategory(Intent.CATEGORY_DEFAULT);
+        i.setData(Uri.parse("package:" + getPackageName()));
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        i.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+        i.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+        startActivity(i);
     }
 
 
