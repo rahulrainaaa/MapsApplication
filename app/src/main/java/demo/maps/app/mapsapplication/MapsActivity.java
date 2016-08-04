@@ -14,6 +14,7 @@ import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
 import android.net.Uri;
+import android.os.Handler;
 import android.provider.Settings;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
@@ -24,157 +25,217 @@ import android.view.MenuItem;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import com.directions.route.AbstractRouting;
+import com.directions.route.Route;
+import com.directions.route.RouteException;
+import com.directions.route.Routing;
+import com.directions.route.RoutingListener;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
+import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, LocationListener, GoogleMap.OnMarkerClickListener {
+/**
+ * @class MapsActivity
+ * @desc Handles the Google Map Demo UI completely.
+ */
 
+public class MapsActivity extends FragmentActivity implements
+        OnMapReadyCallback, LocationListener, GoogleMap.OnMarkerClickListener, RoutingListener {
+
+    //Map and Location objects
     private GoogleMap mMap;
     LocationManager locationManager = null;
+    Polyline line = null;
+
+    //Map point markers
     Marker marker = null;
     Marker srchMarker = null;
 
-    boolean frstSrch = true;
+    //Location points
+    LatLng locStart = null;
+    LatLng locEnd = null;
+
+    //Boolean flags
+    boolean firstSearch = true;
+    boolean firstRefresh = true;
+
+    /**
+     * @desc FragmentActivity required methods override.
+     */
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState)
+    {
+        //Load UI content.
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
-        int check1 = ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION);
-        int check2 = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION);
 
-        if((check1 != PackageManager.PERMISSION_GRANTED) || (check2 != PackageManager.PERMISSION_GRANTED))
-        {
-            Toast.makeText(getApplicationContext(), "Go to permissions and \nEnable all permission", Toast.LENGTH_LONG).show();
-            startInstalledAppDetailsActivity();
-        }
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
-        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
-                .findFragmentById(R.id.map);
+        SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
     }
 
     @Override
-    protected void onResume() {
+    protected void onResume()
+    {
         super.onResume();
 
-        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            Toast.makeText(getApplicationContext(), "Provide Location Access.", Toast.LENGTH_SHORT).show();
+        //Check for permissions
+        int check1 = ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION);
+        int check2 = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION);
+        if((check1 != PackageManager.PERMISSION_GRANTED) || (check2 != PackageManager.PERMISSION_GRANTED))
+        {
+            Toast.makeText(getApplicationContext(), "Go to permissions and \nEnable all permission", Toast.LENGTH_LONG).show();
+            startInstalledAppDetailsActivity();
             return;
         }
-        /*Criteria criteria = new Criteria();
-        String bestProvider = locationManager.getBestProvider(criteria, true);
-        Location location = locationManager.getLastKnownLocation(bestProvider);*/
+
+        //Reset all data and flags
+        LatLng locStart = null;
+        LatLng locEnd = null;
+        boolean firstSearch = true;
+        boolean firstRefresh = true;
+
+        //Initialize location listener
         locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
         locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, this);
+        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000, 0, this);
+        Toast.makeText(getApplicationContext(), "Fetching Current Location", Toast.LENGTH_SHORT).show();
     }
 
     @Override
-    protected void onPause() {
+    protected void onPause()
+    {
+        //Reset all data and flags
+        LatLng locStart = null;
+        LatLng locEnd = null;
+        boolean firstSearch = true;
+        boolean firstRefresh = true;
 
+        //Remove the location listener callback
         if (locationManager != null) {
             if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                Toast.makeText(getApplicationContext(), "Provide Location Access.", Toast.LENGTH_SHORT).show();
                 return;
             }
             locationManager.removeUpdates(this);
         }
+        locationManager = null;
         super.onPause();
     }
 
     @Override
-    public void onMapReady(GoogleMap googleMap) {
+    public void onMapReady(GoogleMap googleMap)
+    {
+        //Set GoogleMap attributes and listeners required
         mMap = googleMap;
         mMap.getUiSettings().setZoomControlsEnabled(true);
         mMap.getUiSettings().setCompassEnabled(true);
         mMap.getUiSettings().setAllGesturesEnabled(true);
         mMap.setOnMarkerClickListener(this);
-        LatLng latlng = new LatLng(18.5204, 73.8567);
-        marker = mMap.addMarker(new MarkerOptions().position(latlng).title("My Position"));
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(latlng));
-        //getLocationFromAddress("Delhi, India");
-
-        PolylineOptions options = new PolylineOptions().width(5).color(Color.BLUE).geodesic(true);
-        options.add(new LatLng(18.571949, 73.749686));
-        options.add(new LatLng(21.293998, 74.923534));
-        Polyline line = mMap.addPolyline(options);
     }
+
+    /**
+     * @desc LocationListener Interface Methods implemented.
+     */
 
     @Override
     public void onLocationChanged(Location location) {
 
+        //Get location and update map pin
         double latitude = location.getLatitude();
         double longitude = location.getLongitude();
         LatLng latLng = new LatLng(latitude, longitude);
 
-        marker.setPosition(latLng);
-
-        mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
-        //mMap.animateCamera(CameraUpdateFactory.zoomTo(15));
-    }
-
-    @Override
-    public void onStatusChanged(String provider, int status, Bundle extras) {
-
-    }
-
-    @Override
-    public void onProviderEnabled(String provider) {
-
-    }
-
-    @Override
-    public void onProviderDisabled(String provider) {
-
-    }
-
-    private boolean isGooglePlayServicesAvailable() {
-        int status = GooglePlayServicesUtil.isGooglePlayServicesAvailable(this);
-        if (ConnectionResult.SUCCESS == status) {
-            return true;
-        } else {
-            GooglePlayServicesUtil.getErrorDialog(status, this, 0).show();
-            return false;
+        //Check if refreshed first time.
+        if(firstRefresh)
+        {
+            //Add Start Marker.
+            marker = mMap.addMarker(new MarkerOptions().position(latLng).title("Current Position"));
+            mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
+            mMap.animateCamera(CameraUpdateFactory.zoomTo(15));
+            firstRefresh = false;
         }
+        else
+        {
+            marker.setPosition(latLng);
+        }
+        locStart = new LatLng(latitude, longitude);
+
     }
 
     @Override
-    public boolean onMarkerClick(Marker marker) {
-        inputTextBox();
-        //Toast.makeText(getApplicationContext(), "Map-Marker Event", Toast.LENGTH_SHORT).show();
+    public void onStatusChanged(String provider, int status, Bundle extras) {}
+
+    @Override
+    public void onProviderEnabled(String provider) {}
+
+    @Override
+    public void onProviderDisabled(String provider) {}
+
+    /**
+     * @desc MapMarker Interface Methods Implemented.
+     */
+
+    @Override
+    public boolean onMarkerClick(Marker marker)
+    {
+        if(marker.getTitle().contains("Destination"))
+        {
+            //Do Routing
+            Routing routing = new Routing.Builder()
+                    .travelMode(Routing.TravelMode.DRIVING)
+                    .withListener(MapsActivity.this)
+                    .waypoints(locStart, locEnd)
+                    .build();
+            routing.execute();
+        }
+        else if(marker.getTitle().contains("Current"))
+        {
+            //Do find some place
+            inputTextBox();
+        }
         return false;
     }
 
-    public void getLocationFromAddress(String strAddress){
-
+    /**
+     * @method getLocationFromAddress
+     * @param strAddress Address/Location String
+     * @desc Get searched location points from address and plot/update on map.
+     */
+    public void getLocationFromAddress(String strAddress)
+    {
+        //Location String to location points
         Geocoder coder = new Geocoder(this);
         List<Address> address;
-
         try {
             address = coder.getFromLocationName(strAddress,5);
             if (address==null) {
             }
             Address location=address.get(0);
-            String locationName = "" + location.getLocality() + ", " + location.getCountryName() + "-" + location.getPostalCode();
-            if(frstSrch)
+            locEnd = new LatLng(location.getLatitude(), location.getLongitude());
+
+            //If searched first time
+            if(firstSearch)
             {
-                //First time search only.
-                frstSrch = false;
+                firstSearch = false;
                 LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
-                srchMarker = mMap.addMarker(new MarkerOptions().position(latLng).title(locationName).icon(BitmapDescriptorFactory.fromResource(R.drawable.pingray)));
+                srchMarker = mMap.addMarker(new MarkerOptions().position(latLng).title("Destination"));
                 mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
             }
             else
@@ -182,18 +243,28 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 double latitude = location.getLatitude();
                 double longitude = location.getLongitude();
                 LatLng latLng = new LatLng(latitude, longitude);
-
+                srchMarker.setTitle("Destination");
                 srchMarker.setPosition(latLng);
 
                 mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
-                //mMap.animateCamera(CameraUpdateFactory.zoomTo(15));
+            }
+            mMap.animateCamera(CameraUpdateFactory.zoomTo(15));
+            //If line not null then remove old polyline routing.
+            if(line != null)
+            {
+                line.remove();
             }
 
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             e.printStackTrace();
         }
     }
 
+    /**
+     * @method inputTextBox
+     * @desc Prompts for Address to be searched on map.
+     */
     public void inputTextBox()
     {
         AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(this);
@@ -202,11 +273,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         alertDialogBuilder.setView(input);
         alertDialogBuilder.setTitle("Search Place");
 
-        alertDialogBuilder
-                .setCancelable(false)
+        alertDialogBuilder.setCancelable(false)
                 .setPositiveButton("OK", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int id) {
 
+                        //Call method for handling search for address queried.
                         MapsActivity.this.getLocationFromAddress(input.getText().toString().trim());
 
                     }
@@ -222,6 +293,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
+
+    /**
+     * @method startInstalledAppDetailsActivity
+     * @desc: launches the permission/setting intent UI for this app to assist for enabling permissions.
+     */
     public void startInstalledAppDetailsActivity()
     {
         final Intent i = new Intent();
@@ -234,5 +310,51 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         startActivity(i);
     }
 
+
+    /**
+     *@desc Routing Listener interface methods implemented.
+    **/
+
+    @Override
+    public void onRoutingFailure(RouteException e) {}
+
+    @Override
+    public void onRoutingStart() {}
+
+    @Override
+    public void onRoutingSuccess(ArrayList<Route> list, int i)
+    {
+        //Get all points and plot the polyLine route.
+        List<LatLng> listPoints = list.get(0).getPoints();
+        PolylineOptions options = new PolylineOptions().width(5).color(Color.BLUE).geodesic(true);
+        Iterator<LatLng> iterator = listPoints.iterator();
+        while(iterator.hasNext())
+        {
+            LatLng data = iterator.next();
+            options.add(data);
+        }
+
+        //If line not null then remove old polyline routing.
+        if(line != null)
+        {
+            line.remove();
+        }
+        line = mMap.addPolyline(options);
+
+        //Show distance and duration.
+        String str = "Distance: " + list.get(0).getDistanceText() + "\nDuration: " + list.get(0).getDurationText();
+        Toast.makeText(getApplicationContext(), "" + str, Toast.LENGTH_LONG).show();
+
+        //Focus on map bounds
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(list.get(0).getLatLgnBounds().getCenter()));
+        LatLngBounds.Builder builder = new LatLngBounds.Builder();
+        builder.include(locStart);
+        builder.include(locEnd);
+        LatLngBounds bounds = builder.build();
+        mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 50));
+    }
+
+    @Override
+    public void onRoutingCancelled() {}
 
 }
